@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="한국어 교육 QUIZ 앱 — Claude AI 기반 문항 자동 생성">
+  <title>한국어 QUIZ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+/* ─── CSS 변수 ─────────────────────────────────────── */
+:root {
+  --color-primary:       #E8734A;
+  --color-primary-light: #FFF0EB;
+  --color-secondary:     #4A90D9;
+  --color-bg:            #FDF8F5;
+  --color-surface:       #FFFFFF;
+  --color-border:        #E8E0D8;
+  --color-text-primary:  #2D2A27;
+  --color-text-secondary:#7A7068;
+  --color-text-hint:     #B0A898;
+  --color-correct:       #3DAA6B;
+  --color-wrong:         #E05252;
+  --color-pending:       #F0A500;
+  --color-disabled:      #D0C8C0;
+  --badge-grammar:  #7C5CBF;
+  --badge-reading:  #2E86AB;
+  --badge-listening:#E07B39;
+  --badge-writing:  #3DAA6B;
+  --badge-speaking: #C94040;
+  --font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  --font-size-xs:   12px;
+  --font-size-sm:   14px;
+  --font-size-base: 16px;
+  --font-size-md:   18px;
+  --font-size-lg:   20px;
+  --font-size-xl:   24px;
+  --font-size-2xl:  32px;
+  --font-weight-regular: 400;
+  --font-weight-medium:  500;
+  --font-weight-bold:    700;
+  --line-height-tight:  1.4;
+  --line-height-normal: 1.6;
+  --line-height-loose:  1.8;
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+  --space-2xl: 48px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-pill: 999px;
+  --shadow-card:  0 2px 8px rgba(0,0,0,0.08);
+  --shadow-modal: 0 8px 32px rgba(0,0,0,0.16);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: var(--font-size-base); -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--font-family);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  line-height: var(--line-height-normal);
+  min-height: 100vh;
+}
+a { color: var(--color-secondary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+ul, ol { list-style: none; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input, textarea { font-family: inherit; font-size: inherit; }
+
+/* ─── 레이아웃 ─────────────────────────────────────── */
+.app-wrapper { max-width: 860px; margin: 0 auto; padding: 0 var(--space-md); }
+.screen { padding: var(--space-lg) 0 var(--space-2xl); }
+
+/* ─── 헤더 ─────────────────────────────────────────── */
+.app-header {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 0 var(--space-md);
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.app-header .app-title { font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); letter-spacing: -0.02em; }
+.header-meta { font-size: var(--font-size-sm); opacity: 0.85; margin-left: auto; }
+
+/* ─── 스피너 ────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block;
+  width: 20px; height: 20px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
+/* ─── AI 로딩 오버레이 ──────────────────────────────── */
+#ai-loading-overlay {
+  position: fixed; inset: 0;
+  background: rgba(253, 248, 245, 0.95);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+}
+#ai-loading-overlay .spinner { width: 48px; height: 48px; border-width: 3px; }
+#ai-loading-msg { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+
+/* ─── 오류 배너 ─────────────────────────────────────── */
+#error-banner {
+  background: #FFF3CD;
+  border: 1px solid var(--color-pending);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin: var(--space-md) 0;
+}
+#error-banner p { color: #856404; font-size: var(--font-size-sm); margin-bottom: var(--space-sm); }
+
+/* ─── 버튼 ─────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--space-xs); padding: 12px var(--space-lg);
+  border-radius: var(--radius-pill); font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium); min-height: 48px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-card); }
+.btn:active:not(:disabled) { transform: translateY(0); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+.btn-primary { background: var(--color-primary); color: #fff; }
+.btn-secondary { background: transparent; color: var(--color-primary); border: 2px solid var(--color-primary); }
+.btn--full-width { width: 100%; }
+
+/* ─── 뱃지 ─────────────────────────────────────────── */
+.badge {
+  display: inline-block; padding: 3px 10px;
+  border-radius: var(--radius-pill); font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium); color: #fff; white-space: nowrap;
+}
+.badge-grammar   { background: var(--badge-grammar); }
+.badge-reading   { background: var(--badge-reading); }
+.badge-listening { background: var(--badge-listening); }
+.badge-writing   { background: var(--badge-writing); }
+.badge-speaking  { background: var(--badge-speaking); }
+
+/* ─── 설정 카드 ─────────────────────────────────────── */
+.setup-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-xl) var(--space-lg);
+  margin-top: var(--space-lg);
+  max-width: 520px;
+  margin-left: auto; margin-right: auto;
+}
+.setup-card--wide { max-width: 720px; }
+.setup-icon { font-size: 40px; margin-bottom: var(--space-sm); text-align: center; }
+.setup-title {
+  font-size: var(--font-size-xl); font-weight: var(--font-weight-bold);
+  color: var(--color-primary); margin-bottom: var(--space-sm);
+  text-align: center; word-break: keep-all;
+}
+.setup-desc {
+  font-size: var(--font-size-sm); color: var(--color-text-secondary);
+  text-align: center; margin-bottom: var(--space-lg); line-height: var(--line-height-normal);
+}
+
+/* ─── 단계 뱃지 ─────────────────────────────────────── */
+.setup-step-indicator {
+  font-size: var(--font-size-xs);
+  background: rgba(255,255,255,0.2);
+  padding: 3px 10px; border-radius: var(--radius-pill);
+}
+
+/* ─── 텍스트 입력 ───────────────────────────────────── */
+.text-input {
+  width: 100%; border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md); padding: 12px var(--space-md);
+  font-size: var(--font-size-base); background: var(--color-bg);
+  transition: border-color 0.15s ease; margin-bottom: var(--space-md);
+}
+.text-input:focus { outline: none; border-color: var(--color-primary); }
+.text-input::placeholder { color: var(--color-text-hint); }
+.text-input--area { resize: vertical; line-height: var(--line-height-loose); }
+.input-label {
+  display: block; font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium); color: var(--color-text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+/* ─── API 키 입력 ───────────────────────────────────── */
+.api-key-input-wrap { display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm); }
+.api-key-input-wrap .text-input { margin-bottom: 0; flex: 1; }
+.btn-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px; border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border); background: var(--color-bg);
+  font-size: 18px; cursor: pointer; transition: border-color 0.15s ease; flex-shrink: 0;
+}
+.btn-icon:hover { border-color: var(--color-primary); }
+.api-key-notice {
+  font-size: var(--font-size-xs); color: var(--color-text-secondary);
+  background: var(--color-bg); border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md); margin-bottom: var(--space-lg);
+  line-height: var(--line-height-normal);
+}
+
+/* ─── 화면 액션 ─────────────────────────────────────── */
+.screen-actions { margin-top: var(--space-lg); }
+.screen-actions--row { display: flex; gap: var(--space-sm); }
+.screen-actions--row .btn { flex: 1; }
+
+/* ─── 급수 선택 ─────────────────────────────────────── */
+.grade-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: var(--space-sm); margin-bottom: var(--space-lg); }
+.grade-btn {
+  aspect-ratio: 1; border: 2px solid var(--color-border);
+  border-radius: var(--radius-md); background: var(--color-surface);
+  font-size: var(--font-size-lg); font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary); cursor: pointer; min-height: 72px;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.grade-btn:hover { border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary); }
+.grade-btn.selected { border-color: var(--color-primary); background: var(--color-primary); color: #fff; }
+
+/* ─── 평가 영역 ─────────────────────────────────────── */
+.domain-fieldset { border: none; padding: 0; margin-bottom: var(--space-lg); }
+.domain-fieldset legend { margin-bottom: var(--space-sm); }
+.domain-checkbox-group { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.domain-chip-label { display: inline-flex; align-items: center; gap: var(--space-xs); cursor: pointer; }
+.domain-checkbox { position: absolute; opacity: 0; width: 0; height: 0; }
+.domain-chip-label .badge { opacity: 0.4; font-size: var(--font-size-sm); padding: 6px 14px; transition: opacity 0.15s ease, transform 0.15s ease; cursor: pointer; }
+.domain-chip-label:hover .badge { opacity: 0.7; }
+.domain-chip-label:has(.domain-checkbox:checked) .badge { opacity: 1; transform: scale(1.05); }
+
+/* ─── 루브릭 카드 ───────────────────────────────────── */
+.rubric-card { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md); margin-bottom: var(--space-md); }
+.rubric-card-title { font-size: var(--font-size-base); font-weight: var(--font-weight-bold); color: var(--color-primary); margin-bottom: var(--space-sm); }
+.rubric-level-row { display: flex; gap: var(--space-sm); align-items: flex-start; margin-bottom: var(--space-sm); }
+.rubric-level-row:last-child { margin-bottom: 0; }
+.rubric-level-label { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); padding: 3px 8px; border-radius: var(--radius-pill); white-space: nowrap; margin-top: 6px; }
+.rubric-level-excellent { background: #D4EDDA; color: #155724; }
+.rubric-level-average   { background: #FFF3CD; color: #856404; }
+.rubric-level-poor      { background: #F8D7DA; color: #721C24; }
+.rubric-textarea {
+  flex: 1; border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  padding: var(--space-sm); font-size: var(--font-size-sm); font-family: inherit;
+  line-height: var(--line-height-normal); background: var(--color-surface);
+  resize: vertical; transition: border-color 0.15s ease;
+}
+.rubric-textarea:focus { outline: none; border-color: var(--color-primary); }
+
+/* ─── 문항 미리보기 ─────────────────────────────────── */
+.question-preview-card { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md); margin-bottom: var(--space-md); }
+.question-preview-header { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); }
+.preview-qnum { font-weight: var(--font-weight-bold); font-size: var(--font-size-sm); min-width: 28px; }
+.preview-type-badge { font-size: var(--font-size-xs); color: var(--color-text-secondary); background: var(--color-surface); border: 1px solid var(--color-border); padding: 2px 8px; border-radius: var(--radius-pill); }
+.preview-passage { font-size: var(--font-size-sm); background: var(--color-surface); border-left: 3px solid var(--color-border); padding: var(--space-sm) var(--space-md); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-bottom: var(--space-sm); white-space: pre-wrap; line-height: var(--line-height-loose); }
+.preview-prompt { font-size: var(--font-size-base); font-weight: var(--font-weight-medium); margin-bottom: var(--space-sm); line-height: var(--line-height-normal); word-break: keep-all; }
+.preview-wordbank { font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-bottom: var(--space-sm); }
+.preview-options { padding-left: var(--space-md); display: flex; flex-direction: column; gap: 4px; }
+.preview-options li { font-size: var(--font-size-sm); color: var(--color-text-secondary); padding: 2px 0; }
+.preview-options li.preview-answer { color: var(--color-correct); font-weight: var(--font-weight-medium); }
+.preview-answer-text { font-size: var(--font-size-sm); color: var(--color-correct); margin-top: var(--space-xs); }
+
+/* ─── 진행 표시 ─────────────────────────────────────── */
+.progress-bar-wrap { display: flex; align-items: center; gap: var(--space-sm); margin: var(--space-md) 0; }
+#progress-text { font-size: var(--font-size-sm); color: var(--color-text-secondary); white-space: nowrap; min-width: 72px; }
+#progress-bar { flex: 1; height: 8px; border-radius: var(--radius-pill); border: none; background: var(--color-border); -webkit-appearance: none; appearance: none; overflow: hidden; }
+#progress-bar::-webkit-progress-bar { background: var(--color-border); border-radius: var(--radius-pill); }
+#progress-bar::-webkit-progress-value { background: var(--color-primary); border-radius: var(--radius-pill); transition: width 0.3s ease; }
+#progress-bar::-moz-progress-bar { background: var(--color-primary); border-radius: var(--radius-pill); }
+
+/* ─── 문항 카드 ─────────────────────────────────────── */
+.question-card { background: var(--color-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: var(--space-lg); margin-bottom: var(--space-md); }
+.question-domain { margin-bottom: var(--space-md); }
+.question-prompt { font-size: var(--font-size-md); line-height: var(--line-height-normal); margin-bottom: var(--space-md); word-break: keep-all; }
+.blank-marker { display: inline-block; color: var(--color-primary); border-bottom: 2px solid var(--color-primary); min-width: 60px; text-align: center; font-weight: var(--font-weight-bold); }
+
+/* ─── 지문 박스 ─────────────────────────────────────── */
+.passage-box { background: #FAFAF8; border-left: 4px solid var(--color-primary); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: var(--space-md); font-size: var(--font-size-sm); line-height: var(--line-height-loose); max-height: 280px; overflow-y: auto; margin-bottom: var(--space-md); white-space: pre-wrap; word-break: keep-all; }
+
+/* ─── 읽기 레이아웃 ─────────────────────────────────── */
+.reading-layout { display: flex; flex-direction: column; gap: var(--space-md); }
+
+/* ─── 선택지 ─────────────────────────────────────────── */
+.options-list { display: flex; flex-direction: column; gap: var(--space-sm); }
+.option-card {
+  display: flex; align-items: center; gap: var(--space-sm);
+  width: 100%; padding: 14px var(--space-md);
+  border: 1.5px solid var(--color-border); border-radius: var(--radius-md);
+  background: var(--color-surface); text-align: left; cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease; font-size: var(--font-size-base);
+}
+.option-card:hover { border-color: var(--color-primary); background: var(--color-primary-light); }
+.option-card.selected { border-color: var(--color-primary); background: var(--color-primary-light); }
+.option-card:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+.option-text { flex: 1; word-break: keep-all; }
+.option-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%; background: var(--color-border);
+  font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.option-card.selected .option-num { background: var(--color-primary); color: #fff; }
+
+/* ─── 단어 은행 & 변형 입력 ─────────────────────────── */
+.word-bank { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-bottom: var(--space-md); }
+.word-chip { padding: 6px 14px; border: 1.5px solid var(--color-primary); border-radius: var(--radius-pill); color: var(--color-primary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); background: #fff; transition: background 0.15s ease, color 0.15s ease; }
+.word-chip:hover { background: var(--color-primary); color: #fff; }
+.transform-input-wrap { margin-bottom: var(--space-sm); }
+.transform-input { width: 100%; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); padding: 12px var(--space-md); font-size: var(--font-size-md); background: var(--color-bg); transition: border-color 0.15s ease; }
+.transform-input:focus { outline: none; border-color: var(--color-primary); }
+.hint-text { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+/* ─── 듣기 ──────────────────────────────────────────── */
+.listening-label { display: block; font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); color: var(--badge-listening); margin-bottom: var(--space-xs); }
+.listening-passage { border-left-color: var(--badge-listening); }
+
+/* ─── 수행형 ────────────────────────────────────────── */
+.performance-conditions { background: var(--color-bg); border-radius: var(--radius-sm); padding: var(--space-md) var(--space-md) var(--space-md) var(--space-2xl); margin-bottom: var(--space-md); list-style: disc; }
+.performance-conditions li { font-size: var(--font-size-sm); line-height: var(--line-height-loose); color: var(--color-text-primary); list-style: disc; }
+.performance-textarea { width: 100%; min-height: 160px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md); font-size: var(--font-size-base); line-height: var(--line-height-loose); resize: vertical; background: var(--color-bg); transition: border-color 0.15s ease; }
+.performance-textarea:focus { outline: none; border-color: var(--color-primary); }
+.performance-textarea::placeholder { color: var(--color-text-hint); }
+.sentence-counter { font-size: var(--font-size-xs); color: var(--color-text-secondary); text-align: right; margin-top: var(--space-xs); }
+
+/* ─── 네비게이션 ────────────────────────────────────── */
+.nav-buttons { display: flex; gap: var(--space-sm); justify-content: space-between; }
+.nav-buttons .btn { flex: 1; }
+
+/* ─── 결과 ──────────────────────────────────────────── */
+.result-header { text-align: center; padding: var(--space-xl) 0 var(--space-lg); }
+.result-emoji { font-size: 48px; margin-bottom: var(--space-sm); }
+.result-title { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); margin-bottom: var(--space-sm); }
+#result-score { font-size: var(--font-size-md); color: var(--color-primary); font-weight: var(--font-weight-medium); }
+@keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.result-card { background: var(--color-surface); border-radius: var(--radius-md); box-shadow: var(--shadow-card); padding: var(--space-md); margin-bottom: var(--space-sm); animation: slideIn 0.3s ease both; }
+.result-card-header { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); }
+.result-qnum { font-weight: var(--font-weight-bold); font-size: var(--font-size-sm); min-width: 28px; }
+.result-status { margin-left: auto; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.result-status.correct { color: var(--color-correct); }
+.result-status.wrong   { color: var(--color-wrong); }
+.result-status.pending { color: var(--color-pending); }
+.result-prompt { font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: var(--line-height-normal); }
+.result-detail { font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--space-xs); }
+.result-detail.correct-answer { color: var(--color-correct); font-weight: var(--font-weight-medium); }
+.result-explanation { font-size: var(--font-size-xs); color: var(--color-text-secondary); background: var(--color-bg); border-radius: var(--radius-sm); padding: var(--space-sm); margin-top: var(--space-sm); line-height: var(--line-height-normal); }
+.result-actions { text-align: center; padding: var(--space-lg) 0; }
+
+/* ─── 루브릭 피드백 ─────────────────────────────────── */
+.rubric-feedback-card { background: #FFFBF0; border: 1px solid #F0E0A0; border-radius: var(--radius-sm); padding: var(--space-md); margin-top: var(--space-sm); }
+.rubric-feedback-title { font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); color: var(--color-pending); margin-bottom: var(--space-sm); }
+.rubric-criteria-row { margin-bottom: var(--space-sm); padding-bottom: var(--space-sm); border-bottom: 1px solid #F0E0A0; }
+.rubric-criteria-row:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.rubric-criteria-name { display: block; font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); color: var(--color-text-primary); margin-bottom: 4px; }
+.rubric-criteria-levels { display: flex; flex-direction: column; gap: 3px; }
+.rubric-level-badge { font-size: var(--font-size-xs); color: var(--color-text-secondary); line-height: var(--line-height-normal); }
+.rubric-level-badge.level-excellent { color: #155724; }
+.rubric-level-badge.level-average   { color: #856404; }
+.rubric-level-badge.level-poor      { color: #721C24; }
+
+/* ─── 모달 ─────────────────────────────────────────── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 300; display: flex; align-items: center; justify-content: center; padding: var(--space-md); }
+.modal-box { background: var(--color-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-modal); padding: var(--space-xl); max-width: 480px; width: 100%; }
+.modal-title { font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); margin-bottom: var(--space-sm); }
+.modal-body { font-size: var(--font-size-base); color: var(--color-text-secondary); margin-bottom: var(--space-lg); line-height: var(--line-height-normal); }
+.modal-actions { display: flex; gap: var(--space-sm); justify-content: flex-end; }
+
+/* ─── 반응형 ────────────────────────────────────────── */
+@media (min-width: 768px) {
+  .app-header { height: 64px; }
+  .app-header .app-title { font-size: var(--font-size-xl); }
+  .reading-layout { flex-direction: row; gap: var(--space-lg); }
+  .reading-passage { flex: 1; max-height: 400px; }
+  .reading-question-side { flex: 1; }
+  .nav-buttons { gap: var(--space-md); }
+  .setup-card { padding: var(--space-xl); }
+  .grade-grid { gap: var(--space-md); }
+  .grade-btn { min-height: 88px; font-size: var(--font-size-xl); }
+  .rubric-criteria-levels { flex-direction: row; flex-wrap: wrap; gap: var(--space-sm); }
+}
+@media (min-width: 1024px) {
+  .app-wrapper { padding: 0 var(--space-lg); }
+  .question-card { padding: var(--space-xl); }
+}
+:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+@media print {
+  .app-header, .nav-buttons, .modal-overlay, #ai-loading-overlay { display: none !important; }
+}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+
+  <script type="text/babel">
+    'use strict';
+    const { useState, useEffect, useCallback, useRef } = React;
+
+    const LS_API_KEY = 'quiz_api_key';
+
+    /* ── 유틸 ────────────────────────────────────────── */
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function highlightBlank(text) {
+      if (!text) return '';
+      return escapeHtml(text).replace(/\[\s*\]/g, '<span class="blank-marker">____</span>');
+    }
+    function domainClass(d) {
+      return { '문법':'grammar','읽기':'reading','듣기':'listening','쓰기':'writing','말하기':'speaking' }[d] || 'grammar';
+    }
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+    }
+    function countSentences(text) {
+      if (!text || !text.trim()) return 0;
+      const m = text.match(/[^.!?。！？\n]+[.!?。！？\n]/g);
+      return m ? m.length : 1;
+    }
+
+    /* ── Claude API ──────────────────────────────────── */
+    async function callClaude(apiKey, systemPrompt, userPrompt) {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'anthropic-dangerous-direct-browser-calls': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }]
+        })
+      });
+      if (!res.ok) {
+        let msg = `API 오류 (${res.status})`;
+        try { const e = await res.json(); msg = e.error?.message || msg; } catch(_) {}
+        throw new Error(msg);
+      }
+      const data = await res.json();
+      const raw = (data.content?.[0]?.text || '')
+        .replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+      try { return JSON.parse(raw); }
+      catch(_) { throw new Error('AI 응답을 파싱할 수 없습니다. 다시 시도해 주세요.'); }
+    }
+
+    /* ── 프롬프트 ────────────────────────────────────── */
+    const RUBRIC_SYS = `너는 한국어 교육 전문가다. 사용자가 제공하는 급수, 학습 목표, 평가 영역을 바탕으로 수행형 문항 채점 루브릭을 생성한다.
+반드시 아래 JSON 형식만 반환하라. 다른 텍스트는 절대 출력하지 마라.
+
+{
+  "rubric": [
+    { "criteria": "과제 완성도", "excellent": "우수 기준을 구체적으로 작성", "average": "보통 기준", "poor": "미흡 기준" },
+    { "criteria": "내용 구성", "excellent": "...", "average": "...", "poor": "..." },
+    { "criteria": "문법 사용", "excellent": "...", "average": "...", "poor": "..." },
+    { "criteria": "어휘 사용", "excellent": "...", "average": "...", "poor": "..." },
+    { "criteria": "의사소통 효과", "excellent": "...", "average": "...", "poor": "..." }
+  ]
+}`;
+
+    function rubricUser(grade, goal, domains) {
+      return `급수: ${grade}
+학습 목표: ${goal}
+평가 영역: ${domains.join(', ')}
+
+위 정보에 맞는 수행형 문항 채점 루브릭을 생성해 주세요. 각 기준의 우수/보통/미흡 수준을 해당 급수 학습자 수준에 맞게 구체적으로 작성하세요.`;
+    }
+
+    const QUESTIONS_SYS = `너는 한국어 교육 전문가다. 사용자가 제공하는 급수, 학습 목표, 평가 영역, 루브릭을 바탕으로 한국어 퀴즈 문항 5개를 생성한다.
+반드시 아래 JSON 형식만 반환하라. 다른 텍스트는 절대 출력하지 마라.
+
+문항 유형 규칙:
+- grammar_mc: 문법 객관식. options 4개, answer는 정답 번호(1~4 정수), scoring_type: "auto"
+- grammar_transform: 문장 변형. options는 빈 배열 [], content.word_bank에 단어 목록, answer는 모범답안 문자열, scoring_type: "auto"
+- reading_mc: 읽기 객관식. content.passage에 지문, options 4개, answer는 정답 번호, scoring_type: "auto"
+- listening_mc: 듣기 객관식. content.passage에 대화/지문(오디오 대체), options 4개, answer는 정답 번호, scoring_type: "auto"
+- performance: 수행형. options 빈 배열, answer: null, scoring_type: "rubric_review", content.passage에 조건 목록(줄바꿈 구분)
+
+JSON 스키마:
+{
+  "questions": [
+    {
+      "id": "Q001",
+      "type": "grammar_mc",
+      "domain": "문법",
+      "prompt": "지시문. 빈칸은 [ ] 기호.",
+      "options": [{"id":1,"text":"선택지1"},{"id":2,"text":"선택지2"},{"id":3,"text":"선택지3"},{"id":4,"text":"선택지4"}],
+      "answer": 2,
+      "scoring_type": "auto",
+      "explanation": "정답 해설",
+      "content": { "passage": null, "word_bank": [] }
+    }
+  ]
+}
+
+주의: 평가 영역에 포함된 도메인만 출제. domain은 "문법"/"읽기"/"듣기"/"쓰기"/"말하기" 중 하나. 학습 목표 문법을 실제 활용하라.`;
+
+    function questionsUser(grade, goal, domains, rubric) {
+      return `급수: ${grade}
+학습 목표: ${goal}
+평가 영역: ${domains.join(', ')}
+
+루브릭:
+${rubric ? JSON.stringify(rubric, null, 2) : '(루브릭 없음)'}
+
+위 정보에 맞는 한국어 퀴즈 문항 5개를 생성해 주세요.`;
+    }
+
+    /* ── 공통 컴포넌트 ───────────────────────────────── */
+    function BlankText({ text, className }) {
+      return <span className={className} dangerouslySetInnerHTML={{ __html: highlightBlank(text) }} />;
+    }
+
+    function DomainBadge({ domain }) {
+      return <span className={`badge badge-${domainClass(domain)}`}>{domain}</span>;
+    }
+
+    /* ── 화면 1: API 키 ──────────────────────────────── */
+    function ApiKeyScreen({ apiKey, onChange, onNext }) {
+      const [show, setShow] = useState(false);
+      return (
+        <section className="screen" aria-label="API 키 입력 화면">
+          <div className="setup-card">
+            <div className="setup-icon">🔑</div>
+            <h1 className="setup-title">Claude API 키를 입력하세요</h1>
+            <p className="setup-desc">AI가 학습 내용에 맞는 루브릭과 문항을 자동으로 생성합니다.</p>
+            <div className="api-key-input-wrap">
+              <input
+                type={show ? 'text' : 'password'}
+                className="text-input"
+                value={apiKey}
+                onChange={e => onChange(e.target.value)}
+                placeholder="sk-ant-..."
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Claude API 키"
+              />
+              <button className="btn-icon" type="button" onClick={() => setShow(s => !s)} aria-label="API 키 표시/숨기기">
+                {show ? '🙈' : '👁'}
+              </button>
+            </div>
+            <p className="api-key-notice">🔒 입력한 API 키는 이 기기의 브라우저에만 저장되며, 외부 서버로 전송되지 않습니다.</p>
+            <div className="screen-actions">
+              <button className="btn btn-primary btn--full-width" disabled={!apiKey.trim()} onClick={onNext}>
+                다음 단계 →
+              </button>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ── 화면 2: 급수 선택 ───────────────────────────── */
+    function GradeScreen({ grade, onChange, onPrev, onNext }) {
+      return (
+        <section className="screen" aria-label="급수 선택 화면">
+          <div className="setup-card">
+            <h2 className="setup-title">학습자의 급수를 선택하세요</h2>
+            <p className="setup-desc">선택한 급수에 맞는 어휘와 문법 수준으로 문항을 생성합니다.</p>
+            <div className="grade-grid" role="group" aria-label="급수 선택">
+              {['1급','2급','3급','4급','5급','6급'].map(g => (
+                <button key={g} className={`grade-btn${grade === g ? ' selected' : ''}`} type="button" onClick={() => onChange(g)}>{g}</button>
+              ))}
+            </div>
+            <div className="screen-actions screen-actions--row">
+              <button className="btn btn-secondary" type="button" onClick={onPrev}>← 이전</button>
+              <button className="btn btn-primary" type="button" disabled={!grade} onClick={onNext}>다음 →</button>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ── 화면 3: 학습 목표 ───────────────────────────── */
+    function GoalScreen({ goal, domains, onGoalChange, onDomainChange, onPrev, onNext }) {
+      const allDomains = ['문법','읽기','듣기','쓰기','말하기'];
+      const canNext = goal.trim().length > 0 && domains.length > 0;
+      return (
+        <section className="screen" aria-label="학습 목표 입력 화면">
+          <div className="setup-card">
+            <h2 className="setup-title">오늘 수업 내용을 입력하세요</h2>
+            <p className="setup-desc">수업 내용이 구체적일수록 더 좋은 문항이 생성됩니다.</p>
+            <label className="input-label" htmlFor="input-goal">학습 목표</label>
+            <textarea
+              id="input-goal"
+              className="text-input text-input--area"
+              placeholder={"예: 4급 10과\n주제: 인터넷 실명제 토론\n표현: -다고 생각하다, -(으)ㄹ 것 같다"}
+              rows={4}
+              value={goal}
+              onChange={e => onGoalChange(e.target.value)}
+              aria-label="학습 목표"
+            />
+            <fieldset className="domain-fieldset">
+              <legend className="input-label">평가 영역을 선택하세요 (복수 선택 가능)</legend>
+              <div className="domain-checkbox-group">
+                {allDomains.map(d => (
+                  <label key={d} className="domain-chip-label">
+                    <input
+                      type="checkbox" name="domain" value={d} className="domain-checkbox"
+                      checked={domains.includes(d)}
+                      onChange={e => onDomainChange(d, e.target.checked)}
+                    />
+                    <span className={`badge badge-${domainClass(d)}`}>{d}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div className="screen-actions screen-actions--row">
+              <button className="btn btn-secondary" type="button" onClick={onPrev}>← 이전</button>
+              <button className="btn btn-primary" type="button" disabled={!canNext} onClick={onNext}>루브릭 생성 →</button>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ── 화면 4: 루브릭 검토 ─────────────────────────── */
+    function RubricScreen({ rubric, onRegen, onAccept }) {
+      const [local, setLocal] = useState(rubric || []);
+      useEffect(() => { setLocal(rubric || []); }, [rubric]);
+
+      function update(idx, level, val) {
+        setLocal(r => r.map((item, i) => i === idx ? { ...item, [level]: val } : item));
+      }
+
+      return (
+        <section className="screen" aria-label="루브릭 검토 화면">
+          <div className="setup-card setup-card--wide">
+            <h2 className="setup-title">📋 루브릭 검토</h2>
+            <p className="setup-desc">생성된 루브릭을 확인하고 필요하면 직접 수정하세요.</p>
+            <div aria-live="polite">
+              {local.map((item, idx) => (
+                <div key={idx} className="rubric-card">
+                  <h3 className="rubric-card-title">{item.criteria}</h3>
+                  {[['excellent','우수','rubric-level-excellent'],['average','보통','rubric-level-average'],['poor','미흡','rubric-level-poor']].map(([lv, label, cls]) => (
+                    <div key={lv} className="rubric-level-row">
+                      <span className={`rubric-level-label ${cls}`}>{label}</span>
+                      <textarea className="rubric-textarea" rows={2} value={item[lv] || ''} onChange={e => update(idx, lv, e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="screen-actions screen-actions--row">
+              <button className="btn btn-secondary" type="button" onClick={onRegen}>🔄 다시 생성</button>
+              <button className="btn btn-primary" type="button" onClick={() => onAccept(local)}>✅ 수락 · 문항 생성 →</button>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ── 화면 5: 문항 미리보기 ───────────────────────── */
+    function QuestionsScreen({ questions, onRegen, onStart }) {
+      const typeLabels = { grammar_mc:'문법 객관식', grammar_transform:'문법 변형형', reading_mc:'읽기 객관식', listening_mc:'듣기 객관식', performance:'수행형' };
+      return (
+        <section className="screen" aria-label="생성 문항 검토 화면">
+          <div className="setup-card setup-card--wide">
+            <h2 className="setup-title">📝 생성된 문항 검토</h2>
+            <p className="setup-desc">문항을 확인하고 만족스러우면 퀴즈를 시작하세요.</p>
+            <div aria-live="polite">
+              {(questions || []).map((q, idx) => (
+                <div key={q.id} className="question-preview-card">
+                  <div className="question-preview-header">
+                    <span className="preview-qnum">Q{idx+1}</span>
+                    <DomainBadge domain={q.domain} />
+                    <span className="preview-type-badge">{typeLabels[q.type] || q.type}</span>
+                  </div>
+                  {q.content?.passage && <div className="preview-passage">{q.content.passage}</div>}
+                  <p className="preview-prompt"><BlankText text={q.prompt} /></p>
+                  {q.content?.word_bank?.length > 0 && <p className="preview-wordbank">단어: {q.content.word_bank.join(' / ')}</p>}
+                  {q.options?.length > 0 ? (
+                    <ul className="preview-options">
+                      {q.options.map(opt => (
+                        <li key={opt.id} className={opt.id === q.answer ? 'preview-answer' : ''}>
+                          {opt.id}. {opt.text}{opt.id === q.answer ? ' ✓' : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : q.answer ? (
+                    <p className="preview-answer-text">모범답안: <strong>{String(q.answer)}</strong></p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            <div className="screen-actions screen-actions--row">
+              <button className="btn btn-secondary" type="button" onClick={onRegen}>🔄 다시 생성</button>
+              <button className="btn btn-primary" type="button" onClick={onStart}>✅ 퀴즈 시작 →</button>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ── 문항 유형별 컴포넌트 ────────────────────────── */
+    function OptionsList({ options, selected, onSelect }) {
+      return (
+        <div className="options-list" role="radiogroup">
+          {options.map(opt => (
+            <button key={opt.id}
+              className={`option-card${selected === opt.id ? ' selected' : ''}`}
+              role="radio" aria-checked={selected === opt.id}
+              onClick={() => onSelect(opt.id)}>
+              <span className="option-num">{opt.id}</span>
+              <span className="option-text">{opt.text}</span>
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    function GrammarMC({ q, answer, onAnswer }) {
+      return (
+        <div>
+          <p className="question-prompt"><BlankText text={q.prompt} /></p>
+          {q.content?.passage && <div className="passage-box">{q.content.passage}</div>}
+          <OptionsList options={q.options} selected={answer} onSelect={onAnswer} />
+        </div>
+      );
+    }
+
+    function GrammarTransform({ q, answer, onAnswer }) {
+      const inputRef = useRef(null);
+      function insertWord(word) {
+        const el = inputRef.current;
+        if (!el) return;
+        const pos = el.selectionStart;
+        const before = el.value.slice(0, pos);
+        const after  = el.value.slice(pos);
+        const sep    = before && !before.endsWith(' ') ? ' ' : '';
+        el.value = before + sep + word + ' ' + after;
+        el.focus();
+        onAnswer(el.value);
+      }
+      return (
+        <div>
+          <p className="question-prompt"><BlankText text={q.prompt} /></p>
+          {q.content?.word_bank?.length > 0 && (
+            <div className="word-bank">
+              {q.content.word_bank.map((w, i) => (
+                <button key={i} type="button" className="word-chip" onClick={() => insertWord(w)}>{w}</button>
+              ))}
+            </div>
+          )}
+          <div className="transform-input-wrap">
+            <input ref={inputRef} type="text" className="transform-input"
+              placeholder="여기에 문장을 입력하세요"
+              autoComplete="off" spellCheck={false}
+              defaultValue={answer || ''}
+              onChange={e => onAnswer(e.target.value)} />
+          </div>
+          <p className="hint-text">단어를 모두 사용하여 자연스러운 문장을 만드세요.</p>
+        </div>
+      );
+    }
+
+    function ReadingMC({ q, answer, onAnswer }) {
+      return (
+        <div className="reading-layout">
+          {q.content?.passage && <div className="passage-box reading-passage">{q.content.passage}</div>}
+          <div className="reading-question-side">
+            <p className="question-prompt"><BlankText text={q.prompt} /></p>
+            <OptionsList options={q.options} selected={answer} onSelect={onAnswer} />
+          </div>
+        </div>
+      );
+    }
+
+    function ListeningMC({ q, answer, onAnswer }) {
+      return (
+        <div>
+          <p className="question-prompt"><BlankText text={q.prompt} /></p>
+          {q.content?.passage && (
+            <div className="passage-box listening-passage">
+              <span className="listening-label">📄 지문</span>
+              {q.content.passage}
+            </div>
+          )}
+          <OptionsList options={q.options} selected={answer} onSelect={onAnswer} />
+        </div>
+      );
+    }
+
+    function Performance({ q, answer, onAnswer }) {
+      const [cnt, setCnt] = useState(() => countSentences(answer || ''));
+      const lines = q.content?.passage ? q.content.passage.split('\n').filter(l => l.trim()) : [];
+      return (
+        <div>
+          <p className="question-prompt"><BlankText text={q.prompt} /></p>
+          {lines.length > 0 && (
+            <ul className="performance-conditions">
+              {lines.map((line, i) => <li key={i}>{line.replace(/^[✓\-\*•]\s*/, '')}</li>)}
+            </ul>
+          )}
+          <textarea className="performance-textarea" placeholder="자유롭게 의견을 쓰세요..." rows={6}
+            defaultValue={answer || ''}
+            onChange={e => { onAnswer(e.target.value); setCnt(countSentences(e.target.value)); }} />
+          <p className="sentence-counter">현재 {cnt}문장</p>
+        </div>
+      );
+    }
+
+    function QuestionBody({ q, answer, onAnswer }) {
+      switch (q.type) {
+        case 'grammar_mc':        return <GrammarMC       q={q} answer={answer} onAnswer={onAnswer} />;
+        case 'grammar_transform': return <GrammarTransform q={q} answer={answer} onAnswer={onAnswer} />;
+        case 'reading_mc':        return <ReadingMC        q={q} answer={answer} onAnswer={onAnswer} />;
+        case 'listening_mc':      return <ListeningMC      q={q} answer={answer} onAnswer={onAnswer} />;
+        case 'performance':       return <Performance      q={q} answer={answer} onAnswer={onAnswer} />;
+        default: return <p>지원하지 않는 문항 유형입니다.</p>;
+      }
+    }
+
+    /* ── 화면 6: 퀴즈 풀기 ───────────────────────────── */
+    function QuizScreen({ questions, answers, currentIdx, onAnswer, onPrev, onNext, onSubmit }) {
+      const q = questions[currentIdx];
+      const total = questions.length;
+      if (!q) return null;
+      return (
+        <section className="screen" aria-label="문항 풀기 화면">
+          <div className="progress-bar-wrap" role="status" aria-live="polite">
+            <span id="progress-text">문항 {currentIdx + 1} / {total}</span>
+            <progress id="progress-bar" value={currentIdx + 1} max={total} aria-label="진행률" />
+          </div>
+          <div className="question-card">
+            <div className="question-domain">
+              <DomainBadge domain={q.domain} />
+            </div>
+            <div aria-live="polite" aria-atomic="true">
+              <QuestionBody key={q.id} q={q} answer={answers[q.id]} onAnswer={val => onAnswer(q.id, val)} />
+            </div>
+          </div>
+          <div className="nav-buttons" role="navigation" aria-label="문항 이동">
+            <button className="btn btn-secondary" disabled={currentIdx === 0} onClick={onPrev} aria-label="이전 문항">← 이전</button>
+            {currentIdx < total - 1
+              ? <button className="btn btn-primary" onClick={onNext} aria-label="다음 문항">다음 →</button>
+              : <button className="btn btn-primary" onClick={onSubmit} aria-label="퀴즈 제출">제출하기</button>
+            }
+          </div>
+        </section>
+      );
+    }
+
+    /* ── 화면 7: 결과 ────────────────────────────────── */
+    function ResultScreen({ session, questions, rubric, onRestart }) {
+      if (!session || !questions) return null;
+      const s = session.auto_score;
+      return (
+        <section className="screen" aria-label="결과 화면">
+          <div className="result-header">
+            <div className="result-emoji" aria-hidden="true">🎉</div>
+            <h2 className="result-title">퀴즈 완료!</h2>
+            <p id="result-score">
+              {s.total_auto > 0
+                ? `자동 채점: ${s.correct} / ${s.total_auto} 정답 (${s.percentage}%)`
+                : '자동 채점 문항 없음'}
+            </p>
+          </div>
+          <div role="list" aria-label="문항별 결과">
+            {questions.map((q, idx) => {
+              const ans = session.answers[q.id];
+              let icon, cls, text;
+              if (q.scoring_type === 'auto') {
+                if (ans?.is_correct === true)  { icon='✓'; cls='correct'; text='정답'; }
+                else if (ans?.value != null)    { icon='✗'; cls='wrong';   text='오답'; }
+                else                            { icon='–'; cls='pending'; text='미응답'; }
+              } else { icon='⏳'; cls='pending'; text='교사 채점 대기'; }
+
+              const myOpt   = q.options?.find(o => o.id === ans?.value);
+              const corrOpt = q.options?.find(o => o.id === q.answer);
+
+              return (
+                <div key={q.id} className="result-card" style={{ animationDelay: `${idx * 0.08}s` }}>
+                  <div className="result-card-header">
+                    <span className="result-qnum">Q{idx+1}</span>
+                    <DomainBadge domain={q.domain} />
+                    <span className={`result-status ${cls}`}>{icon} {text}</span>
+                  </div>
+                  <p className="result-prompt">{q.prompt.length > 80 ? q.prompt.slice(0, 80) + '…' : q.prompt}</p>
+                  {q.scoring_type === 'auto' && ans?.is_correct === false && (
+                    <div>
+                      <p className="result-detail">내 답: {myOpt ? myOpt.text : '미응답'}</p>
+                      <p className="result-detail correct-answer">정답: {corrOpt ? corrOpt.text : String(q.answer)}</p>
+                      {q.explanation && <p className="result-explanation">{q.explanation}</p>}
+                    </div>
+                  )}
+                  {q.scoring_type === 'rubric_review' && rubric && (
+                    <div className="rubric-feedback-card">
+                      <p className="rubric-feedback-title">📋 채점 기준</p>
+                      {rubric.map((item, i) => (
+                        <div key={i} className="rubric-criteria-row">
+                          <span className="rubric-criteria-name">{item.criteria}</span>
+                          <div className="rubric-criteria-levels">
+                            <span className="rubric-level-badge level-excellent">우수: {item.excellent}</span>
+                            <span className="rubric-level-badge level-average">보통: {item.average}</span>
+                            <span className="rubric-level-badge level-poor">미흡: {item.poor}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="result-actions">
+            <button className="btn btn-secondary" onClick={onRestart}>처음부터 다시</button>
+          </div>
+        </section>
+      );
+    }
+
+    /* ── 모달 ────────────────────────────────────────── */
+    function UnansweredModal({ count, onCancel, onConfirm }) {
+      return (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+          <div className="modal-box">
+            <h2 className="modal-title" id="modal-title">미응답 문항이 있습니다</h2>
+            <p className="modal-body">{count}개 문항에 답하지 않았습니다. 그래도 제출하시겠습니까?</p>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={onCancel}>돌아가기</button>
+              <button className="btn btn-primary" onClick={onConfirm}>그래도 제출</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ── 메인 App ────────────────────────────────────── */
+    function App() {
+      const [screen,        setScreen]        = useState('api-key');
+      const [apiKey,        setApiKey]         = useState(() => localStorage.getItem(LS_API_KEY) || '');
+      const [grade,         setGrade]          = useState('');
+      const [goal,          setGoal]           = useState('');
+      const [domains,       setDomains]        = useState([]);
+      const [rubric,        setRubric]         = useState(null);
+      const [questions,     setQuestions]      = useState(null);
+      const [answers,       setAnswers]        = useState({});
+      const [currentIdx,    setCurrentIdx]     = useState(0);
+      const [aiLoading,     setAiLoading]      = useState(false);
+      const [aiMsg,         setAiMsg]          = useState('');
+      const [error,         setError]          = useState('');
+      const [showModal,     setShowModal]      = useState(false);
+      const [session,       setSession]        = useState(null);
+      const sessionIdRef  = useRef(null);
+      const startedAtRef  = useRef(null);
+
+      const STEP_LABELS = { 'api-key':'준비 1/5','grade':'준비 2/5','goal':'준비 3/5','rubric':'준비 4/5','questions':'준비 5/5' };
+      const stepBadge = STEP_LABELS[screen] || '';
+
+      /* 도메인 토글 */
+      function toggleDomain(d, checked) {
+        setDomains(prev => checked ? [...prev, d] : prev.filter(x => x !== d));
+      }
+
+      /* 루브릭 생성 */
+      async function genRubric() {
+        setError('');
+        setAiLoading(true); setAiMsg('Claude AI가 루브릭을 생성 중입니다...');
+        try {
+          const r = await callClaude(apiKey, RUBRIC_SYS, rubricUser(grade, goal, domains));
+          setRubric(r.rubric);
+          setScreen('rubric');
+        } catch(e) { setError('루브릭 생성 실패: ' + e.message); }
+        finally { setAiLoading(false); }
+      }
+
+      /* 루브릭 재생성 */
+      async function regenRubric() {
+        setError('');
+        setAiLoading(true); setAiMsg('Claude AI가 루브릭을 다시 생성 중입니다...');
+        try {
+          const r = await callClaude(apiKey, RUBRIC_SYS, rubricUser(grade, goal, domains));
+          setRubric(r.rubric);
+        } catch(e) { setError('루브릭 재생성 실패: ' + e.message); }
+        finally { setAiLoading(false); }
+      }
+
+      /* 루브릭 수락 → 문항 생성 */
+      async function acceptRubric(edited) {
+        setRubric(edited);
+        setError('');
+        setAiLoading(true); setAiMsg('Claude AI가 문항을 생성 중입니다...');
+        try {
+          const r = await callClaude(apiKey, QUESTIONS_SYS, questionsUser(grade, goal, domains, edited));
+          setQuestions(r.questions);
+          setScreen('questions');
+        } catch(e) { setError('문항 생성 실패: ' + e.message); }
+        finally { setAiLoading(false); }
+      }
+
+      /* 문항 재생성 */
+      async function regenQuestions() {
+        setError('');
+        setAiLoading(true); setAiMsg('Claude AI가 문항을 다시 생성 중입니다...');
+        try {
+          const r = await callClaude(apiKey, QUESTIONS_SYS, questionsUser(grade, goal, domains, rubric));
+          setQuestions(r.questions);
+        } catch(e) { setError('문항 재생성 실패: ' + e.message); }
+        finally { setAiLoading(false); }
+      }
+
+      /* 퀴즈 시작 */
+      function startQuiz() {
+        setAnswers({});
+        setCurrentIdx(0);
+        sessionIdRef.current = generateUUID();
+        startedAtRef.current = new Date().toISOString();
+        setScreen('quiz');
+      }
+
+      /* 답안 저장 */
+      function saveAnswer(qid, val) {
+        setAnswers(prev => ({ ...prev, [qid]: val }));
+      }
+
+      /* 제출 전 확인 */
+      function checkSubmit() {
+        if (!questions) return;
+        const unanswered = questions.filter(q => answers[q.id] === undefined).length;
+        if (unanswered > 0) setShowModal(true);
+        else doSubmit();
+      }
+
+      /* 실제 제출 */
+      function doSubmit() {
+        setShowModal(false);
+        if (!questions) return;
+        const submittedAt = new Date().toISOString();
+        const ans = {};
+        questions.forEach(q => {
+          const val = answers[q.id] !== undefined ? answers[q.id] : null;
+          let isCorrect = null;
+          if (q.scoring_type === 'auto' && val !== null) isCorrect = val === q.answer;
+          ans[q.id] = { type: q.type, value: val, is_correct: isCorrect };
+        });
+        const autoQs = questions.filter(q => q.scoring_type === 'auto');
+        const correct = autoQs.filter(q => ans[q.id].is_correct === true).length;
+        setSession({
+          session_id:   sessionIdRef.current,
+          started_at:   startedAtRef.current,
+          submitted_at: submittedAt,
+          answers:      ans,
+          auto_score: {
+            correct,
+            total_auto:  autoQs.length,
+            percentage:  autoQs.length > 0 ? Math.round(correct / autoQs.length * 100) : 0,
+          }
+        });
+        setScreen('result');
+      }
+
+      /* 다시 시작 */
+      function restart() {
+        setAnswers({});
+        setCurrentIdx(0);
+        setSession(null);
+        setScreen('api-key');
+      }
+
+      /* API 키 다음 */
+      function apiKeyNext() {
+        if (!apiKey.trim()) return;
+        localStorage.setItem(LS_API_KEY, apiKey);
+        setScreen('grade');
+      }
+
+      const unansweredCount = questions
+        ? questions.filter(q => answers[q.id] === undefined).length : 0;
+
+      return (
+        <>
+          {/* AI 로딩 오버레이 */}
+          {aiLoading && (
+            <div id="ai-loading-overlay" role="status" aria-live="polite">
+              <div className="spinner" aria-hidden="true" style={{ width:48, height:48, borderWidth:3 }} />
+              <p id="ai-loading-msg">{aiMsg}</p>
+            </div>
+          )}
+
+          {/* 미답 모달 */}
+          {showModal && (
+            <UnansweredModal count={unansweredCount} onCancel={() => setShowModal(false)} onConfirm={doSubmit} />
+          )}
+
+          {/* 헤더 */}
+          <header className="app-header" role="banner">
+            <span className="app-title">한국어 QUIZ</span>
+            {stepBadge && <span className="header-meta setup-step-indicator">{stepBadge}</span>}
+          </header>
+
+          {/* 메인 */}
+          <main className="app-wrapper" role="main">
+            {/* 에러 배너 */}
+            {error && (
+              <div id="error-banner" role="alert" aria-live="assertive">
+                <p id="error-message">{error}</p>
+                <button className="btn btn-secondary" onClick={() => setError('')}>닫기</button>
+              </div>
+            )}
+
+            {screen === 'api-key'   && <ApiKeyScreen   apiKey={apiKey}   onChange={setApiKey}     onNext={apiKeyNext} />}
+            {screen === 'grade'     && <GradeScreen     grade={grade}    onChange={setGrade}       onPrev={() => setScreen('api-key')} onNext={() => setScreen('goal')} />}
+            {screen === 'goal'      && <GoalScreen      goal={goal}      domains={domains}         onGoalChange={setGoal} onDomainChange={toggleDomain} onPrev={() => setScreen('grade')} onNext={genRubric} />}
+            {screen === 'rubric'    && rubric    && <RubricScreen    rubric={rubric}       onRegen={regenRubric}    onAccept={acceptRubric} />}
+            {screen === 'questions' && questions && <QuestionsScreen  questions={questions} onRegen={regenQuestions} onStart={startQuiz} />}
+            {screen === 'quiz'      && questions && (
+              <QuizScreen
+                questions={questions} answers={answers} currentIdx={currentIdx}
+                onAnswer={saveAnswer}
+                onPrev={() => setCurrentIdx(i => Math.max(0, i - 1))}
+                onNext={() => setCurrentIdx(i => Math.min(questions.length - 1, i + 1))}
+                onSubmit={checkSubmit}
+              />
+            )}
+            {screen === 'result' && <ResultScreen session={session} questions={questions} rubric={rubric} onRestart={restart} />}
+          </main>
+        </>
+      );
+    }
+
+    /* ── 마운트 ──────────────────────────────────────── */
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
