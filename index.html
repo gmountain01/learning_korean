@@ -445,15 +445,11 @@ input, textarea { font-family: inherit; font-size: inherit; }
 
     /* ── Claude API ──────────────────────────────────── */
     async function callClaude(apiKey, systemPrompt, userPrompt) {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/claude', {
         method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-calls': 'true'
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
+          apiKey: apiKey,
           model: 'claude-sonnet-4-6',
           max_tokens: 4096,
           system: systemPrompt,
